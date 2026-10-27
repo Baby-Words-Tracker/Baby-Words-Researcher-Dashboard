@@ -1,0 +1,94 @@
+:host {
+  display: block;
+}
+
+.child-export {
+  padding: 1rem;
+  border: 1px solid color-mix(in srgb, var(--gray-400) 50%, transparent);
+  border-radius: 0.75rem;
+  background: color-mix(in srgb, var(--pill-accent) 6%, white);
+}
+
+.child-export h3 {
+  margin: 0 0 0.75rem;
+  color: var(--gray-900);
+  font-size: 1rem;
+}
+
+.child-export form,
+.limit-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.limit-field label {
+  color: var(--gray-700);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.limit-field input {
+  width: min(100%, 10rem);
+  padding: 0.5rem;
+  border: 1px solid var(--gray-400);
+  border-radius: 0.4rem;
+  font: inherit;
+}
+
+.limit-field small {
+  color: var(--gray-700);
+}
+
+.limit-field .validation-error,
+.export-status.error {
+  color: var(--hot-red);
+}
+
+.export-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.export-actions button {
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.export-actions .btn-primary {
+  border: none;
+  background: var(--primary);
+  color: white;
+}
+
+.export-actions .btn-secondary {
+  border: 1px solid var(--primary);
+  background: white;
+  color: var(--primary);
+}
+
+.export-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.export-status {
+  margin: 0.75rem 0 0;
+  color: var(--gray-700);
+}
+
+.export-status.success {
+  color: oklch(0.45 0.15 145);
+}
+
+@media (max-width: 600px) {
+  .export-actions button,
+  .limit-field input {
+    width: 100%;
+  }
+}

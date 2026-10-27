@@ -10,8 +10,8 @@ import {
   FirestoreItem,
   FirebaseHandlerService
 } from './services/firebase_handler.service';
-import { CsvExportService } from './services/csv-export.service';
 import { ResearchersDataService } from './services/researchers-data.service';
+import { ChildCsvExportComponent } from './components/child-csv-export/child-csv-export.component';
 
 export interface CollectionGroup {
   collection: string;
@@ -37,7 +37,13 @@ interface AuthWithRole {
 
 @Component({
   selector: 'app-root',
-  imports: [AsyncPipe, ReactiveFormsModule, RouterOutlet, BaseChartDirective],
+  imports: [
+    AsyncPipe,
+    ReactiveFormsModule,
+    RouterOutlet,
+    BaseChartDirective,
+    ChildCsvExportComponent
+  ],
   templateUrl: './app.html',
   styleUrl: './app.css'
 })
@@ -45,7 +51,6 @@ export class App {
   protected readonly title = signal('wordbuds');
   protected readonly authService = inject(AuthService);
   protected readonly firebaseService = inject(FirebaseHandlerService);
-  protected readonly csvExport = inject(CsvExportService);
   protected readonly researchersData = inject(ResearchersDataService);
   protected readonly authState$ = this.authService.authState$;
 
@@ -192,7 +197,6 @@ export class App {
   protected readonly currentView = signal<DashboardView>('dashboard');
   protected readonly showViewDropdown = signal(false);
   protected readonly adminAddMessage = signal<string | null>(null);
-  protected readonly exportMessage = signal<string | null>(null);
   protected readonly adminRemoveMessage = signal<string | null>(null);
   /** ID of the UserProfile item currently in edit mode, or null if none. */
   protected readonly editingProfileId = signal<string | null>(null);
@@ -344,19 +348,10 @@ export class App {
       this.adminAddForm.patchValue({ firstName: '', lastName: '', phoneNumber: '', email: '', role: '' });
       this.adminAddMessage.set('Account added successfully.');
       this.showCreateUserModal.set(false);
-    } finally {
-      // after account add we could optionally clear exportMessage
-      this.exportMessage.set(null);
-    }
-  }
-
-  protected async exportAllWords(): Promise<void> {
-    this.exportMessage.set(null);
-    try {
-      const ok = await this.csvExport.exportAllWordsToCSV();
-      this.exportMessage.set(ok ? 'Export started' : 'Nothing to export');
-    } catch (e) {
-      this.exportMessage.set(e instanceof Error ? e.message : 'Export failed');
+    } catch (error) {
+      this.adminAddMessage.set(
+        error instanceof Error ? error.message : 'Failed to create account.'
+      );
     }
   }
   // remove account not allowed according to firebase rules
