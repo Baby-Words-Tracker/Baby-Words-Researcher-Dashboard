@@ -1,0 +1,89 @@
+<section class="child-export" aria-labelledby="child-export-heading">
+  <h3 id="child-export-heading">Export child word data</h3>
+  <form [formGroup]="exportForm" (ngSubmit)="downloadFirstBatch()">
+    <div class="export-field">
+      <label for="child-export-limit">Children per batch</label>
+      <input
+        id="child-export-limit"
+        type="number"
+        formControlName="limit"
+        min="1"
+        max="100"
+        step="1"
+        [attr.aria-invalid]="exportForm.controls.limit.invalid"
+        aria-describedby="child-export-limit-help child-export-limit-error"
+      />
+      <small id="child-export-limit-help">Choose between 1 and 100 children.</small>
+      @if (
+        exportForm.controls.limit.invalid &&
+        (exportForm.controls.limit.dirty || exportForm.controls.limit.touched)
+      ) {
+        <small id="child-export-limit-error" class="validation-error">
+          Limit must be a whole number between 1 and 100.
+        </small>
+      }
+    </div>
+
+    <div class="export-field">
+      <label for="child-export-resume">Resume after Child ID (optional)</label>
+      <input
+        id="child-export-resume"
+        type="text"
+        formControlName="resumeAfterId"
+        autocomplete="off"
+        aria-describedby="child-export-resume-help"
+      />
+      <small id="child-export-resume-help">
+        Enter the last Child_ID from an earlier CSV to continue without downloading it again.
+      </small>
+    </div>
+
+    <div class="export-actions">
+      <button
+        type="submit"
+        class="btn-primary"
+        [disabled]="exportForm.invalid || inProgress()"
+      >
+        {{ inProgress() ? 'Exporting...' : 'Download first batch' }}
+      </button>
+      <button
+        type="button"
+        class="btn-secondary"
+        [disabled]="!hasManualResumeId() || exportForm.invalid || inProgress()"
+        (click)="downloadFromResumeId()"
+      >
+        Download from resume ID
+      </button>
+      <button
+        type="button"
+        class="btn-secondary"
+        [disabled]="!nextCursor() || exportForm.invalid || inProgress()"
+        (click)="downloadNextBatch()"
+      >
+        Download next batch
+      </button>
+    </div>
+  </form>
+
+  @if (nextCursor(); as resumeId) {
+    <div class="saved-progress">
+      <span>Next resume ID</span>
+      <code>{{ resumeId }}</code>
+      <div class="progress-actions">
+        <button type="button" (click)="copyResumeId()">Copy resume ID</button>
+        <button type="button" (click)="clearSavedProgress()">Clear saved progress</button>
+      </div>
+    </div>
+  }
+
+  @if (status(); as exportStatus) {
+    <p
+      class="export-status"
+      [class.success]="exportStatus.kind === 'success'"
+      [class.error]="exportStatus.kind === 'error'"
+      aria-live="polite"
+    >
+      {{ exportStatus.text }}
+    </p>
+  }
+</section>

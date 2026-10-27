@@ -8,10 +8,13 @@ import { FirebaseHandlerService } from './services/firebase_handler.service';
 import { ResearchersDataService } from './services/researchers-data.service';
 
 describe('App', () => {
+  let testRole: string | null;
+
   beforeEach(async () => {
+    testRole = null;
     Object.defineProperty(window, 'localStorage', {
       value: {
-        getItem: vi.fn().mockReturnValue(null),
+        getItem: vi.fn(() => testRole),
         removeItem: vi.fn()
       },
       configurable: true
@@ -43,7 +46,7 @@ describe('App', () => {
         {
           provide: CsvExportService,
           useValue: {
-            exportRows: vi.fn()
+            exportChildWordsBatchToCSV: vi.fn()
           }
         },
         {
@@ -70,5 +73,19 @@ describe('App', () => {
 
     const compiled = fixture.nativeElement as HTMLElement;
     expect(compiled.textContent).toContain('Log in');
+  });
+
+  it('integrates the child CSV export into the researchers dashboard', async () => {
+    testRole = 'researcher';
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const exportComponent = fixture.nativeElement.querySelector(
+      'app-child-csv-export'
+    );
+    expect(exportComponent).not.toBeNull();
+    expect(exportComponent.textContent).toContain('Export child word data');
   });
 });
