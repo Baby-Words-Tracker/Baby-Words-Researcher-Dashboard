@@ -42,6 +42,7 @@ describe('CsvExportService', () => {
 
   it('exports the existing child word CSV schema and values', async () => {
     const repository: IFirestoreRepository = {
+      readPage: vi.fn(),
       readAll: vi.fn(async (collectionName: string) => {
         if (collectionName === Child.collectionName) {
           return [
@@ -110,6 +111,7 @@ describe('CsvExportService', () => {
 
   it('does not download a CSV when a child has no word data', async () => {
     const repository: IFirestoreRepository = {
+      readPage: vi.fn(),
       readAll: vi.fn(async (collectionName: string) =>
         collectionName === Child.collectionName
           ? [{ id: 'child-without-words' }]
