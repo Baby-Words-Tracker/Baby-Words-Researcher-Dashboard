@@ -4,10 +4,28 @@ import { ChildCsvExportComponent } from './child-csv-export.component';
 import { CsvExportService } from '../../services/csv-export.service';
 
 describe('ChildCsvExportComponent', () => {
+  const progressStorageKey = 'wordbuds_child_csv_export_progress';
   const exportChildWordsBatchToCSV = vi.fn();
+  const writeText = vi.fn();
 
   beforeEach(async () => {
     exportChildWordsBatchToCSV.mockReset();
+    writeText.mockReset();
+    writeText.mockResolvedValue(undefined);
+    const storedValues = new Map<string, string>();
+    Object.defineProperty(window, 'localStorage', {
+      configurable: true,
+      value: {
+        clear: () => storedValues.clear(),
+        getItem: (key: string) => storedValues.get(key) ?? null,
+        removeItem: (key: string) => storedValues.delete(key),
+        setItem: (key: string, value: string) => storedValues.set(key, value)
+      }
+    });
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText }
+    });
     await TestBed.configureTestingModule({
       imports: [ChildCsvExportComponent],
       providers: [
@@ -48,6 +66,11 @@ describe('ChildCsvExportComponent', () => {
     expect(fixture.nativeElement.textContent).toContain(
       'Exported 4 rows for 2 children.'
     );
+    expect(fixture.nativeElement.textContent).toContain('child-b');
+    expect(JSON.parse(window.localStorage.getItem(progressStorageKey) ?? '{}')).toEqual({
+      limit: 25,
+      nextCursor: 'child-b'
+    });
 
     const nextButton = findButton(fixture.nativeElement, 'Download next batch');
     expect(nextButton.disabled).toBe(false);
@@ -61,6 +84,57 @@ describe('ChildCsvExportComponent', () => {
     });
     expect(nextButton.disabled).toBe(true);
     expect(fixture.nativeElement.textContent).toContain('No more batches available.');
+    expect(window.localStorage.getItem(progressStorageKey)).toBeNull();
+  });
+
+  it('starts a batch after a manually entered child ID', async () => {
+    exportChildWordsBatchToCSV.mockResolvedValue({
+      selectedChildren: 2,
+      exportedRows: 3,
+      downloaded: true,
+      nextCursor: 'child-99'
+    });
+    const fixture = TestBed.createComponent(ChildCsvExportComponent);
+    fixture.detectChanges();
+    const resumeInput = fixture.nativeElement.querySelector(
+      '#child-export-resume'
+    ) as HTMLInputElement;
+
+    resumeInput.value = 'child-42';
+    resumeInput.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    findButton(fixture.nativeElement, 'Download from resume ID').click();
+    await fixture.whenStable();
+
+    expect(exportChildWordsBatchToCSV).toHaveBeenCalledWith({
+      limit: 25,
+      afterId: 'child-42'
+    });
+  });
+
+  it('restores saved progress and can copy or clear its resume ID', async () => {
+    window.localStorage.setItem(
+      progressStorageKey,
+      JSON.stringify({ limit: 10, nextCursor: 'saved-child' })
+    );
+    const fixture = TestBed.createComponent(ChildCsvExportComponent);
+    fixture.detectChanges();
+
+    const limitInput = fixture.nativeElement.querySelector(
+      '#child-export-limit'
+    ) as HTMLInputElement;
+    expect(limitInput.value).toBe('10');
+    expect(fixture.nativeElement.textContent).toContain('saved-child');
+    expect(findButton(fixture.nativeElement, 'Download next batch').disabled).toBe(false);
+
+    findButton(fixture.nativeElement, 'Copy resume ID').click();
+    await fixture.whenStable();
+    expect(writeText).toHaveBeenCalledWith('saved-child');
+
+    findButton(fixture.nativeElement, 'Clear saved progress').click();
+    fixture.detectChanges();
+    expect(window.localStorage.getItem(progressStorageKey)).toBeNull();
+    expect(findButton(fixture.nativeElement, 'Download next batch').disabled).toBe(true);
   });
 
   it('rejects an invalid limit before calling the export service', () => {
