@@ -126,4 +126,154 @@ describe('CsvExportService', () => {
     expect(result).toBe(false);
     expect(createObjectURL).not.toHaveBeenCalled();
   });
+
+  it('creates a batch CSV for a single child', async () => {
+    const repository: IFirestoreRepository = {
+      readAll: vi.fn(),
+      readPage: vi.fn().mockResolvedValue({
+        items: [
+          {
+            id: 'child-a',
+            wordCount: 1,
+            language: [{ name: 'English' }],
+            birthday: '2022-01-02T00:00:00.000Z',
+            parentIDs: ['parent-a']
+          }
+        ],
+        nextCursor: null
+      }),
+      readAllFromSubcollection: vi.fn().mockResolvedValue([
+        {
+          id: 'word-a',
+          firstUtterance: '2024-01-02T03:04:05.000Z',
+          language: { name: 'English' },
+          note: 'first word'
+        }
+      ]),
+      read: vi.fn().mockResolvedValue({
+        id: 'word-a',
+        languageDetails: {
+          English: {
+            lemma: 'word a',
+            primaryPartOfSpeech: 'noun',
+            allPOS: ['noun'],
+            primaryCategory: 'objects',
+            allCategories: ['objects']
+          }
+        }
+      })
+    };
+
+    const result = await createService(repository).exportChildWordsBatchToCSV({
+      limit: 25
+    });
+
+    expect(result).toEqual({
+      selectedChildren: 1,
+      exportedRows: 1,
+      downloaded: true,
+      nextCursor: null
+    });
+    expect(repository.readPage).toHaveBeenCalledWith(Child.collectionName, {
+      limit: 25,
+      afterId: undefined
+    });
+    expect(clickedAnchor?.getAttribute('download')).toBe(
+      'child_words_first_limit-25.csv'
+    );
+
+    const downloadedBlob = createObjectURL.mock.calls[0][0] as Blob;
+    expect(await readBlobAsText(downloadedBlob)).toBe(
+      [
+        '"Child_ID","Word","First_Utterance_DateTime","Word_Language","Lemma","Primary_Part_Of_Speech","All_Parts_Of_Speech","Primary_Category","All_Categories","Notes","Video_ID","Phrase_ID","Phrase_Text","Child_Total_Word_Count","Child_Languages","Child_Birthday","Parent_IDs","Utterance_Language"',
+        '"child-a","word-a","2024-01-02T03:04:05.000Z","English","word a","noun","noun","objects","objects","first word","","","","1","English","2022-01-02T00:00:00.000Z","parent-a","English"'
+      ].join('\r\n')
+    );
+  });
+
+  it('creates one batch CSV containing rows for multiple children', async () => {
+    const children = [
+      {
+        id: 'child-a',
+        wordCount: 1,
+        language: [{ name: 'English' }],
+        birthday: '2022-01-01T00:00:00.000Z',
+        parentIDs: ['parent-a']
+      },
+      {
+        id: 'child-b',
+        wordCount: 1,
+        language: [{ name: 'French' }],
+        birthday: '2022-02-02T00:00:00.000Z',
+        parentIDs: ['parent-b']
+      }
+    ];
+    const repository: IFirestoreRepository = {
+      readAll: vi.fn(),
+      readPage: vi.fn().mockResolvedValue({
+        items: children,
+        nextCursor: 'child-b'
+      }),
+      readAllFromSubcollection: vi.fn(
+        async (_collection: string, childId: string) => [
+          {
+            id: `word-${childId}`,
+            firstUtterance:
+              childId === 'child-a'
+                ? '2024-03-01T00:00:00.000Z'
+                : '2024-03-02T00:00:00.000Z',
+            language: { name: childId === 'child-a' ? 'English' : 'French' }
+          }
+        ]
+      ),
+      read: vi.fn(async (_collection: string, wordId: string) => {
+        const language = wordId.includes('child-a') ? 'English' : 'French';
+        return {
+          id: wordId,
+          languageDetails: {
+            [language]: { lemma: `${language.toLowerCase()} lemma` }
+          }
+        };
+      })
+    };
+
+    const result = await createService(repository).exportChildWordsBatchToCSV({
+      limit: 2,
+      afterId: 'previous-child'
+    });
+
+    expect(result).toEqual({
+      selectedChildren: 2,
+      exportedRows: 2,
+      downloaded: true,
+      nextCursor: 'child-b'
+    });
+    const downloadedBlob = createObjectURL.mock.calls[0][0] as Blob;
+    const csv = await readBlobAsText(downloadedBlob);
+    expect(csv.split('\r\n')).toEqual([
+      '"Child_ID","Word","First_Utterance_DateTime","Word_Language","Lemma","Primary_Part_Of_Speech","All_Parts_Of_Speech","Primary_Category","All_Categories","Notes","Video_ID","Phrase_ID","Phrase_Text","Child_Total_Word_Count","Child_Languages","Child_Birthday","Parent_IDs","Utterance_Language"',
+      '"child-a","word-child-a","2024-03-01T00:00:00.000Z","English","english lemma","","","","","","","","","1","English","2022-01-01T00:00:00.000Z","parent-a","English"',
+      '"child-b","word-child-b","2024-03-02T00:00:00.000Z","French","french lemma","","","","","","","","","1","French","2022-02-02T00:00:00.000Z","parent-b","French"'
+    ]);
+  });
+
+  it('rejects batch data that cannot conform to the CSV format', async () => {
+    const repository: IFirestoreRepository = {
+      readAll: vi.fn(),
+      readPage: vi.fn().mockResolvedValue({
+        items: [{ id: 'child-invalid', birthday: 'not-a-date' }],
+        nextCursor: null
+      }),
+      readAllFromSubcollection: vi.fn(),
+      read: vi.fn()
+    };
+
+    await expect(
+      createService(repository).exportChildWordsBatchToCSV({ limit: 25 })
+    ).rejects.toThrow(
+      'Child child-invalid has invalid birthday data for CSV export'
+    );
+    expect(repository.readAllFromSubcollection).not.toHaveBeenCalled();
+    expect(createObjectURL).not.toHaveBeenCalled();
+  });
 });
